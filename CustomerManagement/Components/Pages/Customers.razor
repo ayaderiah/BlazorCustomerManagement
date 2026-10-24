@@ -1,0 +1,607 @@
+﻿@page "/customers"
+@rendermode InteractiveServer
+
+@using EFCourseApp
+@using CustomerManagement.Data
+@using Microsoft.EntityFrameworkCore
+
+@inject IDbContextFactory<CustomerDbContext> DbFactory
+
+<PageTitle>Customers | CustomerManagement</PageTitle>
+
+<div class="crm-page">
+
+    @* page header *@
+    <div class="crm-heading">
+        <div>
+            <div class="crm-breadcrumb">
+                Dashboard / Customers / Overview
+            </div>
+
+            <h1>Customers Overview</h1>
+            <p>Manage and organize your customers in one place.</p>
+        </div>
+
+        <button class="crm-primary-btn" @onclick="OpenAddModal">
+            <span>+</span> Add Customer
+        </button>
+    </div>
+
+    @* statistics cards *@
+    <div class="crm-stats">
+
+        <div class="crm-stat-card">
+            <div class="crm-stat-top">
+                <span>Total Customers</span>
+                <span class="crm-stat-icon">◎</span>
+            </div>
+
+            <div class="crm-stat-number">@customers.Count</div>
+            <div class="crm-stat-description">
+                Customers in your database
+            </div>
+        </div>
+
+        <div class="crm-stat-card">
+            <div class="crm-stat-top">
+                <span>Search Results</span>
+                <span class="crm-stat-icon">⌕</span>
+            </div>
+
+            <div class="crm-stat-number">@FilteredCustomers.Count()</div>
+            <div class="crm-stat-description">
+                Matching your current filters
+            </div>
+        </div>
+
+        <div class="crm-stat-card">
+            <div class="crm-stat-top">
+                <span>Latest Customer ID</span>
+                <span class="crm-stat-icon">↗</span>
+            </div>
+
+            <div class="crm-stat-number">
+                @(customers.Count > 0 ? customers.Max(c => c.Id).ToString() : "—")
+            </div>
+
+            <div class="crm-stat-description">
+                Highest current customer ID
+            </div>
+        </div>
+
+    </div>
+
+    @* customers table section *@
+    <div class="crm-panel">
+
+        <div class="crm-panel-heading">
+            <div>
+                <h2>Customer Directory</h2>
+                <p>View, search, edit and manage customer records.</p>
+            </div>
+
+            <span class="crm-record-badge">
+                @FilteredCustomers.Count() Records
+            </span>
+        </div>
+
+        @* filters *@
+        <div class="crm-toolbar">
+
+            <div class="crm-search">
+                <span class="crm-search-icon">⌕</span>
+
+                <input type="text"
+                       placeholder="Search name or email..."
+                       @bind="searchText"
+                       @bind:event="oninput" />
+            </div>
+
+            <input class="crm-filter-input"
+                   type="text"
+                   placeholder="Customer ID"
+                   @bind="searchId"
+                   @bind:event="oninput" />
+
+            <select class="crm-sort" @bind="sortOrder">
+                <option value="idAsc">ID: Ascending</option>
+                <option value="idDesc">ID: Descending</option>
+                <option value="nameAsc">Name: A - Z</option>
+                <option value="nameDesc">Name: Z - A</option>
+            </select>
+
+            <button class="crm-reset-btn" @onclick="ResetFilters">
+                Reset
+            </button>
+
+        </div>
+
+        @* customer data *@
+        <div class="crm-table-scroll">
+            <table class="crm-table">
+
+                <thead>
+                    <tr>
+                        <th>Customer ID</th>
+                        <th>Customer Name</th>
+                        <th>Email Address</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @if (FilteredCustomers.Any())
+                    {
+                        @foreach (var customer in PageCustomers)
+                        {
+                            <tr>
+                                <td>
+                                    <span class="crm-id">
+                                        #@customer.Id
+                                    </span>
+                                </td>
+
+                                <td>
+                                    <div class="crm-customer">
+                                        <div class="crm-avatar">
+                                            @GetInitials(customer.Name)
+                                        </div>
+
+                                        <span class="crm-name">
+                                            @customer.Name
+                                        </span>
+                                    </div>
+                                </td>
+
+                                <td>
+                                    <span class="crm-email">
+                                        @customer.Email
+                                    </span>
+                                </td>
+
+                                <td>
+                                    <div class="crm-actions">
+
+                                        <button class="crm-edit-btn"
+                                                title="Edit customer"
+                                                @onclick="() => OpenEditModal(customer)">
+                                            Edit
+                                        </button>
+
+                                        <button class="crm-delete-btn"
+                                                title="Delete customer"
+                                                @onclick="() => OpenDeleteModal(customer)">
+                                            Delete
+                                        </button>
+
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="4">
+                                <div class="crm-empty">
+                                    <div class="crm-empty-icon">⌕</div>
+                                    <h3>No customers found</h3>
+                                    <p>Try changing your search or filters.</p>
+
+                                    <button class="crm-reset-btn"
+                                            @onclick="ResetFilters">
+                                        Clear Filters
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+
+            </table>
+        </div>
+
+        @* pagination *@
+        <div class="crm-pagination">
+
+            <span>
+                Showing @PageCustomers.Count() of
+                @FilteredCustomers.Count() customers
+            </span>
+
+            <div class="crm-page-buttons">
+                <button disabled="@(EffectivePage == 1)"
+                        @onclick="PreviousPage">
+                    Previous
+                </button>
+
+                <span class="crm-page-number">
+                    @EffectivePage / @TotalPages
+                </span>
+
+                <button disabled="@(EffectivePage == TotalPages)"
+                        @onclick="NextPage">
+                    Next
+                </button>
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="crm-footer">
+        Customer Management System · ASP.NET Core Blazor + EF Core
+    </div>
+
+</div>
+
+@* add and edit modal *@
+@if (modalType == "add" || modalType == "edit")
+{
+    <div class="crm-overlay">
+        <div class="crm-modal" role="dialog" aria-modal="true">
+
+            <div class="crm-modal-heading">
+                <div>
+                    <h2>
+                        @(modalType == "add" ? "Add New Customer" : "Edit Customer")
+                    </h2>
+
+                    <p>
+                        @(modalType == "add"
+                                            ? "Enter the information for your new customer."
+                                            : "Update the selected customer's details.")
+                </p>
+            </div>
+
+                <button class="crm-close-btn"
+                        disabled="@isSaving"
+                        @onclick="CloseModal">
+                    ×
+                </button>
+            </div>
+
+            <div class="crm-modal-body">
+
+                <label>Full Name</label>
+                <input class="crm-modal-input"
+                       placeholder="Enter customer name"
+                       @bind="formCustomer.Name" />
+
+                <label>Email Address</label>
+                <input class="crm-modal-input"
+                       type="email"
+                       placeholder="customer@example.com"
+                       @bind="formCustomer.Email" />
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="crm-error">@errorMessage</div>
+                }
+
+            </div>
+
+            <div class="crm-modal-footer">
+                <button class="crm-cancel-btn"
+                        disabled="@isSaving"
+                        @onclick="CloseModal">
+                    Cancel
+                </button>
+
+                <button class="crm-primary-btn"
+                        disabled="@isSaving"
+                        @onclick="SaveCustomer">
+                    @(isSaving ? "Saving..." : modalType == "add" ? "Add Customer" : "Save Changes")
+                </button>
+            </div>
+
+        </div>
+    </div>
+}
+
+@* delete confirmation modal *@
+@if (modalType == "delete")
+{
+    <div class="crm-overlay">
+        <div class="crm-modal" role="dialog" aria-modal="true">
+
+            <div class="crm-modal-heading">
+                <div>
+                    <h2>Delete Customer</h2>
+                    <p>This action cannot be undone.</p>
+                </div>
+
+                <button class="crm-close-btn"
+                        disabled="@isSaving"
+                        @onclick="CloseModal">
+                    ×
+                </button>
+            </div>
+
+            <div class="crm-modal-body">
+                <div class="crm-delete-warning">
+                    Are you sure you want to delete
+                    <strong>@formCustomer.Name</strong>?
+                </div>
+
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="crm-error">@errorMessage</div>
+                }
+            </div>
+
+            <div class="crm-modal-footer">
+                <button class="crm-cancel-btn"
+                        disabled="@isSaving"
+                        @onclick="CloseModal">
+                    Cancel
+                </button>
+
+                <button class="crm-danger-btn"
+                        disabled="@isSaving"
+                        @onclick="DeleteCustomer">
+                    @(isSaving ? "Deleting..." : "Confirm Delete")
+                </button>
+            </div>
+
+        </div>
+    </div>
+}
+
+@code {
+    List<Customer> customers = new List<Customer>();
+
+    Customer formCustomer = new Customer();
+
+    string searchText = "";
+    string searchId = "";
+    string sortOrder = "idAsc";
+    string modalType = "";
+    string errorMessage = "";
+
+    bool isSaving = false;
+
+    int currentPage = 1;
+    int pageSize = 8;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCustomers();
+    }
+
+    // load customers from sql server
+    async Task LoadCustomers()
+    {
+        using var db = DbFactory.CreateDbContext();
+
+        customers = await db.Customers
+            .AsNoTracking()
+            .ToListAsync();
+    }
+
+    // filter and sort customers
+    IEnumerable<Customer> FilteredCustomers
+    {
+        get
+        {
+            var result = customers.Where(c =>
+                ((c.Name ?? "").Contains(
+                    searchText, StringComparison.OrdinalIgnoreCase)
+                ||
+                (c.Email ?? "").Contains(
+                    searchText, StringComparison.OrdinalIgnoreCase))
+                &&
+                (string.IsNullOrWhiteSpace(searchId)
+                || c.Id.ToString() == searchId.Trim())
+            );
+
+            if (sortOrder == "idDesc")
+                return result.OrderByDescending(c => c.Id);
+
+            if (sortOrder == "nameAsc")
+                return result.OrderBy(c => c.Name);
+
+            if (sortOrder == "nameDesc")
+                return result.OrderByDescending(c => c.Name);
+
+            return result.OrderBy(c => c.Id);
+        }
+    }
+
+    // pagination
+    int TotalPages
+    {
+        get
+        {
+            int count = FilteredCustomers.Count();
+            return Math.Max(1, (int)Math.Ceiling(count / (double)pageSize));
+        }
+    }
+
+    int EffectivePage => Math.Min(currentPage, TotalPages);
+
+    IEnumerable<Customer> PageCustomers =>
+        FilteredCustomers
+            .Skip((EffectivePage - 1) * pageSize)
+            .Take(pageSize);
+
+    void NextPage()
+    {
+        if (EffectivePage < TotalPages)
+            currentPage = EffectivePage + 1;
+    }
+
+    void PreviousPage()
+    {
+        if (EffectivePage > 1)
+            currentPage = EffectivePage - 1;
+    }
+
+    void ResetFilters()
+    {
+        searchText = "";
+        searchId = "";
+        sortOrder = "idAsc";
+        currentPage = 1;
+    }
+
+    // customer initials for avatar
+    string GetInitials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return "?";
+
+        var parts = name.Trim().Split(' ',
+            StringSplitOptions.RemoveEmptyEntries);
+
+        if (parts.Length >= 2)
+            return (parts[0].Substring(0, 1)
+                + parts[1].Substring(0, 1)).ToUpper();
+
+        return parts[0].Substring(0, 1).ToUpper();
+    }
+
+    // add customer
+    void OpenAddModal()
+    {
+        formCustomer = new Customer();
+        errorMessage = "";
+        modalType = "add";
+    }
+
+    // edit customer
+    void OpenEditModal(Customer customer)
+    {
+        formCustomer = new Customer
+        {
+            Id = customer.Id,
+            Name = customer.Name,
+            Email = customer.Email
+        };
+
+        errorMessage = "";
+        modalType = "edit";
+    }
+
+    // delete confirmation
+    void OpenDeleteModal(Customer customer)
+    {
+        formCustomer = new Customer
+        {
+            Id = customer.Id,
+            Name = customer.Name,
+            Email = customer.Email
+        };
+
+        errorMessage = "";
+        modalType = "delete";
+    }
+
+    void CloseModal()
+    {
+        modalType = "";
+        errorMessage = "";
+    }
+
+    // save add or edit
+    async Task SaveCustomer()
+    {
+        if (isSaving)
+            return;
+
+        if (string.IsNullOrWhiteSpace(formCustomer.Name) ||
+            string.IsNullOrWhiteSpace(formCustomer.Email))
+        {
+            errorMessage = "Please enter name and email.";
+            return;
+        }
+
+        if (!System.Net.Mail.MailAddress.TryCreate(
+            formCustomer.Email, out _))
+        {
+            errorMessage = "Please enter a valid email address.";
+            return;
+        }
+
+        isSaving = true;
+
+        try
+        {
+            using var db = DbFactory.CreateDbContext();
+
+            if (modalType == "add")
+            {
+                db.Customers.Add(formCustomer);
+            }
+            else if (modalType == "edit")
+            {
+                var customer = await db.Customers.FindAsync(
+                    formCustomer.Id);
+
+                if (customer == null)
+                {
+                    errorMessage = "Customer not found.";
+                    return;
+                }
+
+                customer.Name = formCustomer.Name;
+                customer.Email = formCustomer.Email;
+            }
+            else
+            {
+                return;
+            }
+
+            await db.SaveChangesAsync();
+            await LoadCustomers();
+
+            CloseModal();
+        }
+        catch (Exception)
+        {
+            errorMessage = "Could not save customer. Please try again.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    // delete customer from database
+    async Task DeleteCustomer()
+    {
+        if (isSaving)
+            return;
+
+        isSaving = true;
+
+        try
+        {
+            using var db = DbFactory.CreateDbContext();
+
+            var customer = await db.Customers.FindAsync(
+                formCustomer.Id);
+
+            if (customer == null)
+            {
+                errorMessage = "Customer not found.";
+                return;
+            }
+
+            db.Customers.Remove(customer);
+
+            await db.SaveChangesAsync();
+            await LoadCustomers();
+
+            CloseModal();
+        }
+        catch (Exception)
+        {
+            errorMessage = "Could not delete customer. Please try again.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}
